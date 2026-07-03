@@ -1,0 +1,108 @@
+{
+  "id": "cREDD9WxhjnK7aYn",
+  "name": "Mission Launched Automation",
+  "active": true,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "PATCH",
+        "path": "mission-launched",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "f2e560b7-42f8-4a7b-8f42-a5b21055d591",
+      "name": "Receber Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "mission-launched"
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.map((item) => {\n  const body = item.json.body ?? item.json;\n  const mission = body.mission ?? body;\n  const eventId = `${Date.now()}-${Math.random().toString(16).slice(2)}`;\n\n  return {\n    json: {\n      eventId,\n      eventType: 'MISSION_LAUNCHED',\n      registeredAt: new Date().toISOString(),\n      missionId: mission.id,\n      missionName: mission.name,\n      destination: mission.destination,\n      status: mission.status\n    }\n  };\n});"
+      },
+      "id": "9cfb7f51-9d71-40f8-bd8d-ccbf41cfa2e7",
+      "name": "Registrar Evento",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        280,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://api:3000/events",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "id": "f28abdb6-9902-43f5-ad3e-a6165e91f11c",
+      "name": "Registrar Evento na API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        560,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok: true, eventId: $('Registrar Evento').item.json.eventId }) }}",
+        "options": {}
+      },
+      "id": "2dcf345f-3956-4edc-9e86-f79727523b46",
+      "name": "Responder Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        840,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "Receber Webhook": {
+      "main": [
+        [
+          {
+            "node": "Registrar Evento",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Registrar Evento": {
+      "main": [
+        [
+          {
+            "node": "Registrar Evento na API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Registrar Evento na API": {
+      "main": [
+        [
+          {
+            "node": "Responder Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
