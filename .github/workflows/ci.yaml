@@ -1,0 +1,183 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  changes:
+    name: Detectar mudancas
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+      k8s: ${{ steps.filter.outputs.k8s }}
+      docker_backend: ${{ steps.filter.outputs.docker_backend }}
+      docker_frontend: ${{ steps.filter.outputs.docker_frontend }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            backend:
+              - 'app/**'
+              - 'pyproject.toml'
+            frontend:
+              - 'frontend/**'
+            k8s:
+              - 'k8s/**'
+            docker_backend:
+              - 'app/**'
+              - '.dockerignore'
+              - 'docker-compose.yml'
+            docker_frontend:
+              - 'frontend/**'
+              - '.dockerignore'
+              - 'docker-compose.yml'
+
+  backend:
+    name: Backend lint/test/build
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: |
+            app/requirements.txt
+            app/requirements-dev.txt
+
+      - name: Instalar dependencias
+        run: python -m pip install -r app/requirements-dev.txt
+
+      - name: Lint
+        run: python -m ruff check app
+
+      - name: Teste basico da API
+        run: |
+          DATABASE_PATH="${RUNNER_TEMP}/missions-ci.db" EVENTS_API_TOKEN="ci-token" python - <<'PY'
+          from fastapi.testclient import TestClient
+
+          from app.main import app
+
+          client = TestClient(app)
+
+          health = client.get("/missions?page=1&page_size=5")
+          assert health.status_code == 200, health.text
+
+          print("Backend smoke test passed.")
+          PY
+
+      - name: Build/check backend
+        run: |
+          python -m compileall app
+          python -c "from app.main import app; print(app.title)"
+
+  frontend:
+    name: Frontend lint/test/build
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Lint se configurado
+        run: npm run lint --if-present
+
+      - name: Build
+        run: npm run build
+
+      - name: Teste basico do bundle
+        run: |
+          test -f dist/index.html
+          test "$(find dist/assets -name '*.js' | wc -l)" -gt 0
+          test "$(find dist/assets -name '*.css' | wc -l)" -gt 0
+          node -e "const fs = require('fs'); const html = fs.readFileSync('dist/index.html', 'utf8'); if (!html.includes('id=\"root\"')) process.exit(1); console.log('Frontend smoke test passed.');"
+
+  k8s-validate:
+    name: Validar manifests k8s
+    needs: changes
+    if: needs.changes.outputs.k8s == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instalar kubeconform
+        run: |
+          curl -sSLo kubeconform.tar.gz \
+            https://github.com/yannh/kubeconform/releases/download/v0.6.7/kubeconform-linux-amd64.tar.gz
+          tar xzf kubeconform.tar.gz
+          sudo mv kubeconform /usr/local/bin/
+
+      - name: Validar manifests
+        run: kubeconform -strict -summary -ignore-missing-schemas k8s/
+
+  docker-backend:
+    name: Validar imagem backend
+    needs: changes
+    if: |
+      needs.changes.outputs.docker_backend == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: app/Dockerfile
+          push: false
+          tags: space-missions-backend:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  docker-frontend:
+    name: Validar imagem frontend
+    needs: changes
+    if: |
+      needs.changes.outputs.docker_frontend == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build
+        uses: docker/build-push-action@v6
+        with:
+          context: frontend
+          file: frontend/Dockerfile
+          push: false
+          tags: space-missions-frontend:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

@@ -1,7 +1,13 @@
 from enum import Enum
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, Field, StringConstraints, ValidationInfo, field_validator
+from pydantic import (
+    BaseModel,
+    Field,
+    StringConstraints,
+    ValidationInfo,
+    field_validator,
+)
 
 RequiredText = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
 
