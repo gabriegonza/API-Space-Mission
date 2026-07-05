@@ -13,4 +13,5 @@ data:
   N8N_PROTOCOL: "http"
   N8N_SECURE_COOKIE: "false"
   NODE_OPTIONS: "--max-old-space-size=768"
-  WEBHOOK_URL: "http://n8n.space-missions.test/"
+  #WEBHOOK_URL: "http://n8n.space-missions.test/" 
+  WEBHOOK_URL: "http://localhost:5678/"

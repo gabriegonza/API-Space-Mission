@@ -4,5 +4,7 @@ metadata:
   name: configmap-front
   namespace: frontend
 data:
-  VITE_API_URL: "http://api.space-missions.test"
-  VITE_N8N_URL: "http://n8n.space-missions.test"
+#  VITE_API_URL: "http://api.space-missions.test"  # --- Variavel para configurada para o ingress 
+#  VITE_N8N_URL: "http://n8n.space-missions.test"  # --- Variavel para configurada para o ingress
+  VITE_API_URL: "http://localhost:3001"  # --- Variavel para configurada para o port-forward
+  VITE_N8N_URL: "http://localhost:5678"  # --- Variavel para configurada para o port-forward

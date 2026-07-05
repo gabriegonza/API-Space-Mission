@@ -363,6 +363,36 @@ k8s/
     secret.yaml
     service.yaml
 ```
+
+# Teste local com port-forward
+
+Tambem e possivel testar os Services do Kubernetes sem usar o Ingress.
+
+Como o front-end usa os hosts do Ingress por padrao, ajuste temporariamente o
+ConfigMap para apontar para as portas locais
+
+Em terminais separados, execute:
+
+```bash
+kubectl -n backend port-forward svc/backend-service 3001:3001
+kubectl -n frontend port-forward svc/frontend-service 8080:80
+kubectl -n n8n port-forward svc/service-n8n 5678:5678
+```
+
+URLs para teste:
+
+| Servico | URL |
+| --- | --- |
+| Front-end | `http://localhost:8080` |
+| API | `http://localhost:3001` |
+| n8n | `http://localhost:5678` |
+
+Teste rapido da API:
+
+```bash
+curl "http://localhost:3001/missions"
+```
+
 ### Validação do Ingress
 
 A validação do Ingress foi feita a partir de um pod temporário dentro do cluster, usando a imagem `curlimages/curl`.
