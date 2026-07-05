@@ -24,3 +24,8 @@ app.add_middleware(
 register_exception_handlers(app)
 app.include_router(mission_router)
 app.include_router(event_router)
+
+
+@app.get("/health", tags=["health"])
+def health_check() -> dict[str, str]:
+    return {"status": "ok"}

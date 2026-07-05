@@ -17,10 +17,22 @@ spec:
     spec:
       containers:
         - name: backend
-          image: gabriegonza/space-missions-backend:v1.0.1 #Minha imagem do dockerhub
+          image: gabriegonza/space-missions-backend:v1.0.2 #Minha imagem do dockerhub
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 3000
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 15
+            periodSeconds: 20
           envFrom:
             - configMapRef:
                 name: configmap-backend
