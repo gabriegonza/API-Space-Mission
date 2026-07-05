@@ -25,6 +25,7 @@ class MissionService:
         self.repository = repository
         self.notifier = notifier
 
+    # Cria uma missão
     def create(self, data: MissionCreate) -> Mission:
         if self.repository.get_by_name(data.name) is not None:
             raise DuplicateMissionNameError()
