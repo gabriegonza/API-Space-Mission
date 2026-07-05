@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
         - name: backend
-          image: gabriegonza/space-missions-backend:v1.0.1
+          image: gabriegonza/space-missions-backend:v1.0.1 #Minha imagem do dockerhub
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 3000
