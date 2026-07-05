@@ -2,7 +2,7 @@
 
 Plataforma para gerenciamento de missões espaciais.
 
-O projeto contém uma API em Python, um front-end em React, persistência local com SQLite, Docker Compose e uma automação no n8n para eventos de lançamento de missão.
+O projeto contém uma API em Python/FastAPI, um front-end em React, persistência local com SQLite, Docker Compose, manifests Kubernetes e uma automação no n8n para registrar eventos de lançamento de missão.
 
 ## Tecnologias
 
@@ -13,10 +13,14 @@ O projeto contém uma API em Python, um front-end em React, persistência local 
 - TypeScript
 - Vite
 - Docker
+- Docker Compose
 - SQLite
 - n8n
+- Kubernetes
+- GitHub Actions
+- Ruff
 
-## Como rodar
+## Como rodar com Docker
 
 Na raiz do projeto, execute:
 
@@ -33,13 +37,16 @@ Serviços disponíveis:
 | Documentação da API | `http://localhost:3001/docs` |
 | n8n | `http://localhost:5678` |
 
-
 ## Estrutura
 
 ```text
-space-missions-api/
+space-missions/
+  .github/
+    workflows/
+      ci.yaml
   app/
     controllers/
+
       mission_controller.py
     database.py
     exception_handlers.py
@@ -47,29 +54,64 @@ space-missions-api/
     main.py
     n8n_notifier.py
     repository.py
+    requirements.txt
+    requirements-dev.txt
     schemas.py
     service.py
+    Dockerfile
   frontend/
+    public/
     src/
       components/
       constants/
       services/
       types/
       App.tsx
+      config.ts
       main.tsx
       styles.css
+    Dockerfile
+    docker-entrypoint.sh
+    package.json
+    package-lock.json
+    vite.config.ts
+  k8s/
+    backend/
+      configmap-back.yaml
+      deployment.yaml
+      ingress.yaml
+      namespace.yaml
+      pvc.yaml
+      secret.yaml
+      service-back.yaml
+    frontend/
+      configmap-front.yaml
+      deployment.yaml
+      ingress-front.yaml
+      namespace.yaml
+      service.yaml
+    n8n/
+      configmap.yaml
+      configmap-file.yaml
+      deployment.yaml
+      ingress-n8n.yaml
+      namespace.yaml
+      pvc.yaml
+      secret.yaml
+      service.yaml
   n8n/
     mission-launched-workflow.json
   docker-compose.yml
-  Dockerfile
-  requirements.txt
+  pyproject.toml
+  README.md
+
 ```
 
 ## Backend
 
-A API foi organizada em camadas:
+A API fica em `app/` e foi organizada em camadas:
 
-- `main.py`: inicialização da aplicação.
+- `main.py`: inicialização da aplicação FastAPI.
 - `controllers/`: rotas HTTP.
 - `service.py`: regras de negócio e validações.
 - `repository.py`: acesso aos dados.
@@ -87,11 +129,7 @@ data/missions.db
 
 ## Front-end
 
-O front-end fica em:
-
-```text
-frontend/
-```
+O front-end fica em `frontend/`.
 
 Ele contém:
 
@@ -103,7 +141,8 @@ Ele contém:
 - paginação com 5 ou 10 missões por página;
 - modal para criar missão;
 - modal para atualizar status;
-- link para abrir o n8n pela opção `Automação`.
+- painel de eventos;
+- link para abrir o n8n.
 
 ## Endpoints
 
@@ -193,10 +232,28 @@ Body:
 }
 ```
 
+### Listar eventos
+
+```http
+GET /events?limit=20
+```
+
+### Criar evento interno
+
+```http
+POST /events
+```
+
+Esse endpoint exige o header:
+
+```http
+X-Internal-Token: <token>
+```
+
 ## Regras de negócio
 
 - Uma missão só pode ser criada com `status = planned`.
-- Os campos `name`, `destination` e `status` não podem ser nulos na criação.
+- `name`, `destination` e `status` são obrigatórios na criação.
 - O nome da missão não pode ser duplicado.
 - A atualização aceita apenas os status:
   - `launched`
@@ -270,6 +327,155 @@ Body:
 }
 ```
 
+## Kubernetes
+
+Os manifests ficam em:
+
+```text
+k8s/
+```
+
+Eles estão separados por componente:
+
+```text
+k8s/
+  backend/
+    configmap-back.yaml
+    deployment.yaml
+    ingress.yaml
+    namespace.yaml
+    pvc.yaml
+    secret.yaml
+    service-back.yaml
+  frontend/
+    configmap-front.yaml
+    deployment.yaml
+    ingress-front.yaml
+    namespace.yaml
+    service.yaml
+  n8n/
+    configmap.yaml
+    configmap-file.yaml
+    deployment.yaml
+    ingress-n8n.yaml
+    namespace.yaml
+    pvc.yaml
+    secret.yaml
+    service.yaml
+```
+### Validação do Ingress
+
+A validação do Ingress foi feita a partir de um pod temporário dentro do cluster, usando a imagem `curlimages/curl`.
+Como os domínios `space-missions.test`, `api.space-missions.test` e `n8n.space-missions.test` são resolvidos pelo Ingress, os testes foram feitos enviando o header `Host` correspondente para o serviço interno do `ingress-nginx`.
+Todos os serviços responderam com HTTP 200 via `ingress-nginx`.
+
+Front-end:
+
+```bash
+kubectl run curl-test --rm -it --restart=Never --image=curlimages/curl -- \
+  curl -vi http://ingress-nginx-controller.ingress-nginx.svc.cluster.local/ \
+  -H "Host: space-missions.test"
+```
+
+API:
+
+```bash
+kubectl run curl-test --rm -it --restart=Never --image=curlimages/curl -- \
+  curl -vi "http://ingress-nginx-controller.ingress-nginx.svc.cluster.local/missions?page=1&page_size=5" \
+  -H "Host: api.space-missions.test"
+```
+
+n8n:
+
+```bash
+kubectl run curl-test --rm -it --restart=Never --image=curlimages/curl -- \
+  curl -vi http://ingress-nginx-controller.ingress-nginx.svc.cluster.local/ \
+  -H "Host: n8n.space-missions.test"
+```
+
+### Secrets
+
+O backend e o n8n usam `EVENTS_API_TOKEN`.
+
+Como os componentes estão em namespaces diferentes, existem Secrets separados:
+
+- `k8s/backend/secret.yaml`
+- `k8s/n8n/secret.yaml`
+
+Para ambiente real, o ideal é não versionar tokens verdadeiros no Git. Use valores de exemplo no repositório e crie os Secrets reais diretamente no cluster.
+
+
+## Qualidade e CI
+
+O projeto usa GitHub Actions em:
+
+```text
+.github/workflows/ci.yaml
+```
+A CI detecta quais partes do projeto mudaram e executa apenas os jobs necessários.
+Atualmente, o projeto ainda não possui uma pasta de testes dedicada para backend e front-end.
+Por isso, a pipeline do GitHub Actions executa validações básicas para garantir que as principais partes do projeto
+Essas validações funcionam como tests iniciais. Elas não substituem uma pasta completa de testes, mas ajudam a identificar rapidamente problemas de build, lint, configuração e inicialização da aplicação.
+
+
+### Backend
+
+Quando há mudanças em `app/` ou `pyproject.toml`, a CI:
+
+- instala `app/requirements-dev.txt`;
+- executa `ruff check app`;
+- faz um test básico da API;
+- compila os arquivos Python;
+- valida se o app FastAPI pode ser importado.
+
+Comandos locais:
+
+```bash
+python -m pip install -r app/requirements-dev.txt
+python -m ruff check app
+python -m compileall app
+```
+
+### Front-end
+
+Quando há mudanças em `frontend/`, a CI:
+
+- instala dependências com `npm ci`;
+- executa lint se existir script configurado;
+- gera o build de produção;
+- valida se o bundle foi criado.
+
+Comandos locais:
+
+```bash
+cd frontend
+npm install
+npm run build
+```
+
+### Kubernetes
+
+Quando há mudanças em `k8s/`, a CI valida os manifests com `kubeconform`.
+
+### Docker
+
+A CI valida se as imagens Docker conseguem ser construídas.
+
+Ela não publica imagens, não altera manifests Kubernetes e não faz deploy automático.
+
+Comandos locais:
+
+```bash
+docker build -f app/Dockerfile -t space-missions-backend:ci .
+docker build -t space-missions-frontend:ci frontend
+```
+
+## Observações
+
+- A pasta `data/` guarda o banco SQLite da API.
+- A pasta `n8n-data/` guarda os dados internos do n8n.
+- Essas pastas são ignoradas pelo Git.
+
 ## Rodar localmente sem Docker
 
 Backend:
@@ -288,9 +494,3 @@ cd frontend
 npm install
 npm run dev
 ```
-
-## Observações
-
-- A pasta `data/` guarda o banco SQLite da API.
-- A pasta `n8n-data/` guarda os dados internos do n8n.
-- Essas pastas são ignoradas pelo Git.
