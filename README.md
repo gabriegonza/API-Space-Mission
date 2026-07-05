@@ -494,3 +494,12 @@ cd frontend
 npm install
 npm run dev
 ```
+
+### Evoluções Futuras
+
+Algumas melhorias podem ser consideradas para evoluir a plataforma:
+
+- Adicionar monitoramento e observabilidade com ferramentas como Prometheus e Grafana, permitindo acompanhar metricas, uso de recursos, disponibilidade dos serviços e saúde do ambiente.
+- Substituir o SQLite por um banco de dados mais adequado para produção, como PostgreSQL ou MySQL, melhorando escalabilidade, concorrência e persistência em ambientes distribuídos.
+- Colocar um sistema de mensageria, como RabbitMQ ou Kafka, para separar o processamento de eventos, evitar perda e duplicidade de mensagens.
+- Implantar a solução em um ambiente cloud, como AWS, usando serviços gerenciados para banco de dados, containers, monitoramento, rede e armazenamento.
