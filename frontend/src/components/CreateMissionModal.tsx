@@ -9,6 +9,7 @@ interface CreateMissionModalProps {
   onSubmit: (payload: MissionCreatePayload) => Promise<void>;
 }
 
+//Modal para criar uma missão
 const initialForm: MissionCreatePayload = {
   name: "",
   destination: "",
