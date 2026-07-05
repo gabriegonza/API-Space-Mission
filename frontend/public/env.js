@@ -1,0 +1,1 @@
+window.__SPACE_MISSIONS_CONFIG__ = window.__SPACE_MISSIONS_CONFIG__ || {};

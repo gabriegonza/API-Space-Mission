@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend-deployment
+  namespace: backend
+  labels:
+    app: backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      containers:
+        - name: backend
+          image: gabriegonza/space-missions-backend:v1.0.1
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 3000
+          envFrom:
+            - configMapRef:
+                name: configmap-backend
+            - secretRef:
+                name: backend-secret
+          volumeMounts:
+            - name: backend-pvc
+              mountPath: /app/data
+          resources:
+            requests: 
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+                memory: "256Mi"
+                cpu: "500m"
+      volumes:
+        - name: backend-pvc
+          persistentVolumeClaim:
+            claimName: backend-pvc

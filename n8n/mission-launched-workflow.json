@@ -36,7 +36,16 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "http://api:3000/events",
+        "url": "={{ $env.BACKEND_EVENTS_URL }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Internal-Token",
+              "value": "={{ $env.EVENTS_API_TOKEN }}"
+            }
+          ]
+        },
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify($json) }}",

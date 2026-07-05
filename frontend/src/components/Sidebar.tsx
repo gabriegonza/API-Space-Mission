@@ -1,4 +1,6 @@
-import { Activity, Gauge, Satellite } from "lucide-react";
+import { Gauge, Satellite } from "lucide-react";
+
+import { N8N_URL } from "../config";
 
 export function Sidebar() {
   return (
@@ -17,7 +19,7 @@ export function Sidebar() {
         </a>
         <a
           className="nav-item"
-          href="http://localhost:5678"
+          href={N8N_URL}
           rel="noreferrer"
           target="_blank"
           title="Abrir automacao no n8n"
